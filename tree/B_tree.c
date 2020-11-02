@@ -1,232 +1,403 @@
+
 #include <stdio.h>
 #include <stdlib.h>
-#include <assert.h>
-#include <string.h>
 
-#define MAX_KEYS (3)
+#define TREE 3
 
-struct btNode {
-    int isLeaf;     /* is this a leaf node? */
-    int numKeys;    /* how many keys does this node contain? */
-    int keys[MAX_KEYS];
-    struct btNode *kids[MAX_KEYS+1];  /* kids[i] holds nodes < keys[i] */
+#define MAX (TREE - 1)
+// Yan Wei Min version
+#define MIN (((TREE)%2)?((TREE+1)/2-1):(TREE/2-1)) // ⌈m/2⌉ - 1
+
+struct BTreeNode {
+	int item[MAX + 1], count;
+	struct BTreeNode* linker[MAX + 1];
 };
 
-/* implementation of a B-tree */
-typedef struct btNode bTree;
-typedef struct btNode *P_bTree;
+struct BTreeNode* root;
 
-/* create a new empty tree */
-P_bTree btCreate(void);
-
-/* free a tree */
-void btDestroy(P_bTree t);
-
-/* return nonzero if key is present in tree */
-int btSearch(P_bTree t, int key);
-
-/* insert a new element into a tree */
-void btInsert(P_bTree t, int key);
-
-/* print all keys of the tree in order */
-void btPrintKeys(P_bTree t);
-
-P_bTree
-btCreate(void)
+#define MAX_QUEUE 0x400
+void printTree(struct BTreeNode* bt)
 {
-    P_bTree b;
+	struct BTreeNode* queue[MAX_QUEUE];
+	int i, ii, queue_start, queue_end, space;
+	int count;
+	for (i = 0; i < 80; i++)
+	{
+		printf("-");
+	}
+	printf("\n");
+	count = 0;
+	for (i = 0; i < MAX_QUEUE; i++)
+	{
+		queue[i] = NULL;
+	}
+	queue_start = 0;
+	queue_end = 0;
+	queue[queue_start % MAX_QUEUE] = bt;
+	queue_end = (queue_end + 1) % MAX_QUEUE;
+	while (queue_start != queue_end && queue[queue_start])
+	{
+		space = 0;
+		count++;
+		space += printf("%2d: ", count);
+		for (i = 0; i < queue[queue_start]->count; i++)
+		{
+			space += printf("%3d  ", queue[queue_start]->item[i + 1]);
+		}
+		if (queue[queue_start]->linker[0])
+		{
 
-    b = malloc(sizeof(*b));
-    assert(b);
+			for (ii = space; ii < 20; ii++)
+			{
+				printf(" ");
+			}
+			printf("-> ");
 
-    b->isLeaf = 1;
-    b->numKeys = 0;
-
-    return b;
+			for (i = 0; i < queue[queue_start]->count + 1; i++)
+			{
+				queue[queue_end] = (struct BTreeNode*)queue[queue_start]->linker[i];
+				queue_end = (queue_end + 1) % MAX_QUEUE;
+				printf("%3d  |  ", ((struct BTreeNode*)queue[queue_start]->linker[i])->item[1]);
+			}
+		}
+		printf("\n");
+		queue[queue_start] = NULL;
+		queue_start = (queue_start + 1) % MAX_QUEUE;
+	}
+	printf("\n");
 }
 
-void
-btDestroy(P_bTree b)
-{
-    int i;
-
-    if(!b->isLeaf) {
-        for(i = 0; i < b->numKeys + 1; i++) {
-            btDestroy(b->kids[i]);
-        }
-    }
-
-    free(b);
+// Node creation
+struct BTreeNode* createNode(int item, struct BTreeNode* child) {
+	struct BTreeNode* newNode;
+	newNode = (struct BTreeNode*)malloc(sizeof(struct BTreeNode));
+	newNode->item[1] = item;
+	newNode->count = 1;
+	newNode->linker[0] = root;
+	newNode->linker[1] = child;
+	return newNode;
 }
 
-/* return smallest index i in sorted array such that key <= a[i] */
-/* (or n if there is no such index) */
-static int
-searchKey(int n, const int *a, int key)
-{
-    int lo;
-    int hi;
-    int mid;
-
-    /* invariant: a[lo] < key <= a[hi] */
-    lo = -1;
-    hi = n;
-
-    while(lo + 1 < hi) {
-        mid = (lo+hi)/2;
-        if(a[mid] == key) {
-            return mid;
-        } else if(a[mid] < key) {
-            lo = mid;
-        } else {
-            hi = mid;
-        }
-    }
-
-    return hi;
+// Add value to the node
+void addValToNode(int item, int pos, struct BTreeNode* node,
+	struct BTreeNode* child) {
+	int j = node->count;
+	while (j > pos) {
+		node->item[j + 1] = node->item[j];
+		node->linker[j + 1] = node->linker[j];
+		j--;
+	}
+	node->item[j + 1] = item;
+	node->linker[j + 1] = child;
+	node->count++;
 }
 
-int
-btSearch(P_bTree b, int key)
-{
-    int pos;
+// Split the node
+void splitNode(int item, int* pval, int pos, struct BTreeNode* node,
+	struct BTreeNode* child, struct BTreeNode** newNode) {
+	int median, j;
 
-    /* have to check for empty tree */
-    if(b->numKeys == 0) {
-        return 0;
-    }
+	if (pos > MIN)
+		median = MIN + 1;
+	else
+		median = MIN;
 
-    /* look for smallest position that key fits below */
-    pos = searchKey(b->numKeys, b->keys, key);
+	*newNode = (struct BTreeNode*)malloc(sizeof(struct BTreeNode));
+	j = median + 1;
+	while (j <= MAX) {
+		(*newNode)->item[j - median] = node->item[j];
+		(*newNode)->linker[j - median] = node->linker[j];
+		j++;
+	}
+	node->count = median;
+	(*newNode)->count = MAX - median;
 
-    if(pos < b->numKeys && b->keys[pos] == key) {
-        return 1;
-    } else {
-        return(!b->isLeaf && btSearch(b->kids[pos], key));
-    }
+	if (pos <= MIN) {
+		addValToNode(item, pos, node, child);
+	}
+	else {
+		addValToNode(item, pos - median, *newNode, child);
+	}
+	*pval = node->item[node->count];
+	(*newNode)->linker[0] = node->linker[node->count];
+	node->count--;
 }
 
-/* insert a new key into a tree */
-/* returns new right sibling if the node splits */
-/* and puts the median in *median */
-/* else returns 0 */
-static P_bTree
-btInsertInternal(P_bTree b, int key, int *median)
-{
-    int pos;
-    int mid;
-    P_bTree b2;
+// Set the value in the node
+int setValueInNode(int item, int* pval,
+	struct BTreeNode* node, struct BTreeNode** child) {
+	int pos;
+	if (!node) {
+		*pval = item;
+		*child = NULL;
+		return 1;
+	}
 
-    pos = searchKey(b->numKeys, b->keys, key);
-
-    if(pos < b->numKeys && b->keys[pos] == key) {
-        /* nothing to do */
-        return 0;
-    }
-
-    if(b->isLeaf) {
-
-        /* everybody above pos moves up one space */
-        memmove(&b->keys[pos+1], &b->keys[pos], sizeof(*(b->keys)) * (b->numKeys - pos));
-        b->keys[pos] = key;
-        b->numKeys++;
-
-    } else {
-
-        /* insert in child */
-        b2 = btInsertInternal(b->kids[pos], key, &mid);
-        
-        /* maybe insert a new key in b */
-        if(b2) {
-
-            /* every key above pos moves up one space */
-            memmove(&b->keys[pos+1], &b->keys[pos], sizeof(*(b->keys)) * (b->numKeys - pos));
-            /* new kid goes in pos + 1*/
-            memmove(&b->kids[pos+2], &b->kids[pos+1], sizeof(*(b->keys)) * (b->numKeys - pos));
-
-            b->keys[pos] = mid;
-            b->kids[pos+1] = b2;
-            b->numKeys++;
-        }
-    }
-
-    /* we waste a tiny bit of space by splitting now
-     * instead of on next insert */
-    if(b->numKeys >= MAX_KEYS) {
-        mid = b->numKeys/2;
-
-        *median = b->keys[mid];
-
-        /* make a new node for keys > median */
-        /* picture is:
-         *
-         *      3 5 7
-         *      A B C D
-         *
-         * becomes
-         *          (5)
-         *      3        7
-         *      A B      C D
-         */
-        b2 = malloc(sizeof(*b2));
-
-        b2->numKeys = b->numKeys - mid - 1;
-        b2->isLeaf = b->isLeaf;
-
-        memmove(b2->keys, &b->keys[mid+1], sizeof(*(b->keys)) * b2->numKeys);
-        if(!b->isLeaf) {
-            memmove(b2->kids, &b->kids[mid+1], sizeof(*(b->kids)) * (b2->numKeys + 1));
-        }
-
-        b->numKeys = mid;
-
-        return b2;
-    } else {
-        return 0;
-    }
+	if (item < node->item[1]) {
+		pos = 0;
+	}
+	else {
+		for (pos = node->count;
+			(item < node->item[pos] && pos > 1); pos--)
+			;
+		if (item == node->item[pos]) {
+			printf("Duplicates not allowed\n");
+			return 0;
+		}
+	}
+	if (setValueInNode(item, pval, node->linker[pos], child)) {
+		if (node->count < MAX) {
+			addValToNode(*pval, pos, node, *child);
+		}
+		else {
+			splitNode(*pval, pval, pos, node, *child, child);
+			return 1;
+		}
+	}
+	return 0;
 }
 
-void
-btInsert(P_bTree b, int key)
-{
-    P_bTree b1;   /* new left child */
-    P_bTree b2;   /* new right child */
-    int median;
+// Insertion operation
+struct BTreeNode* insertion(struct BTreeNode* bt, int item) {
+	int flag, i;
+	struct BTreeNode* child;
 
-    b2 = btInsertInternal(b, key, &median);
-
-    if(b2) {
-        /* basic issue here is that we are at the root */
-        /* so if we split, we have to make a new root */
-
-        b1 = malloc(sizeof(*b1));
-        assert(b1);
-
-        /* copy root to b1 */
-        memmove(b1, b, sizeof(*b));
-
-        /* make root point to b1 and b2 */
-        b->numKeys = 1;
-        b->isLeaf = 0;
-        b->keys[0] = median;
-        b->kids[0] = b1;
-        b->kids[1] = b2;
-    }
+	flag = setValueInNode(item, &i, bt, &child);
+	if (flag)
+	{
+		return createNode(i, child);
+	}
+	else
+	{
+		return bt;
+	}
 }
 
-int main()
-{
-    P_bTree root;
-    int i;
+// Copy the successor
+void copySuccessor(struct BTreeNode* myNode, int pos) {
+	struct BTreeNode* dummy;
+	dummy = myNode->linker[pos];
 
-    root = btCreate();
-    btInsert(root, 20);
-    btInsert(root, 30);
-    btInsert(root, 50);
-    btInsert(root, 52);
-    btInsert(root, 60);
-    btInsert(root, 68);
-    btInsert(root, 70);
+	for (; dummy->linker[0] != NULL;)
+		dummy = dummy->linker[0];
+	myNode->item[pos] = dummy->item[1];
+}
 
-    return 0;
+// Remove the value
+void removeVal(struct BTreeNode* myNode, int pos) {
+	int i = pos + 1;
+	while (i <= myNode->count) {
+		myNode->item[i - 1] = myNode->item[i];
+		myNode->linker[i - 1] = myNode->linker[i];
+		i++;
+	}
+	myNode->count--;
+}
+
+// Do right shift
+void rightShift(struct BTreeNode* myNode, int pos) {
+	struct BTreeNode* x = myNode->linker[pos];
+	int j = x->count;
+
+	while (j > 0) {
+		x->item[j + 1] = x->item[j];
+		x->linker[j + 1] = x->linker[j];
+	}
+	x->item[1] = myNode->item[pos];
+	x->linker[1] = x->linker[0];
+	x->count++;
+
+	x = myNode->linker[pos - 1];
+	myNode->item[pos] = x->item[x->count];
+	myNode->linker[pos] = x->linker[x->count];
+	x->count--;
+	return;
+}
+
+// Do left shift
+void leftShift(struct BTreeNode* myNode, int pos) {
+	int j = 1;
+	struct BTreeNode* x = myNode->linker[pos - 1];
+
+	x->count++;
+	x->item[x->count] = myNode->item[pos];
+	x->linker[x->count] = myNode->linker[pos]->linker[0];
+
+	x = myNode->linker[pos];
+	myNode->item[pos] = x->item[1];
+	x->linker[0] = x->linker[1];
+	x->count--;
+
+	while (j <= x->count) {
+		x->item[j] = x->item[j + 1];
+		x->linker[j] = x->linker[j + 1];
+		j++;
+	}
+	return;
+}
+
+// Merge the nodes
+void mergeNodes(struct BTreeNode* myNode, int pos) {
+	int j = 1;
+	struct BTreeNode* x1 = myNode->linker[pos], * x2 = myNode->linker[pos - 1];
+
+	x2->count++;
+	x2->item[x2->count] = myNode->item[pos];
+	x2->linker[x2->count] = myNode->linker[0];
+
+	while (j <= x1->count) {
+		x2->count++;
+		x2->item[x2->count] = x1->item[j];
+		x2->linker[x2->count] = x1->linker[j];
+		j++;
+	}
+
+	j = pos;
+	while (j < myNode->count) {
+		myNode->item[j] = myNode->item[j + 1];
+		myNode->linker[j] = myNode->linker[j + 1];
+		j++;
+	}
+	myNode->count--;
+	free(x1);
+}
+
+// Adjust the node
+void adjustNode(struct BTreeNode* myNode, int pos) {
+	if (!pos) {
+		if (myNode->linker[1]->count > MIN) {
+			leftShift(myNode, 1);
+		}
+		else {
+			mergeNodes(myNode, 1);
+		}
+	}
+	else {
+		if (myNode->count != pos) {
+			if (myNode->linker[pos - 1]->count > MIN) {
+				rightShift(myNode, pos);
+			}
+			else {
+				if (myNode->linker[pos + 1]->count > MIN) {
+					leftShift(myNode, pos + 1);
+				}
+				else {
+					mergeNodes(myNode, pos);
+				}
+			}
+		}
+		else {
+			if (myNode->linker[pos - 1]->count > MIN)
+				rightShift(myNode, pos);
+			else
+				mergeNodes(myNode, pos);
+		}
+	}
+}
+
+// Delete a value from the node
+int delValFromNode(int item, struct BTreeNode* myNode) {
+	int pos, flag = 0;
+	if (myNode) {
+		if (item < myNode->item[1]) {
+			pos = 0;
+			flag = 0;
+		}
+		else {
+			for (pos = myNode->count; (item < myNode->item[pos] && pos > 1); pos--)
+				;
+			if (item == myNode->item[pos]) {
+				flag = 1;
+			}
+			else {
+				flag = 0;
+			}
+		}
+		if (flag) {
+			if (myNode->linker[pos - 1]) {
+				copySuccessor(myNode, pos);
+				flag = delValFromNode(myNode->item[pos], myNode->linker[pos]);
+				if (flag == 0) {
+					printf("Given data is not present in B-Tree\n");
+				}
+			}
+			else {
+				removeVal(myNode, pos);
+			}
+		}
+		else {
+			flag = delValFromNode(item, myNode->linker[pos]);
+		}
+		if (myNode->linker[pos]) {
+			if (myNode->linker[pos]->count < MIN)
+				adjustNode(myNode, pos);
+		}
+	}
+	return flag;
+}
+
+// Delete operaiton
+void delete (int item, struct BTreeNode* myNode) {
+	struct BTreeNode* tmp;
+	if (!delValFromNode(item, myNode)) {
+		printf("Not present\n");
+		return;
+	}
+	else {
+		if (myNode->count == 0) {
+			tmp = myNode;
+			myNode = myNode->linker[0];
+			free(tmp);
+		}
+	}
+	root = myNode;
+	return;
+}
+
+void searching(int item, int* pos, struct BTreeNode* myNode) {
+	if (!myNode) {
+		return;
+	}
+
+	if (item < myNode->item[1]) {
+		*pos = 0;
+	}
+	else {
+		for (*pos = myNode->count;
+			(item < myNode->item[*pos] && *pos > 1); (*pos)--)
+			;
+		if (item == myNode->item[*pos]) {
+			printf("%d present in B-tree", item);
+			return;
+		}
+	}
+	searching(item, pos, myNode->linker[*pos]);
+	return;
+}
+
+void traversal(struct BTreeNode* myNode) {
+	int i;
+	if (myNode) {
+		for (i = 0; i < myNode->count; i++) {
+			traversal(myNode->linker[i]);
+			printf("%d ", myNode->item[i + 1]);
+		}
+		traversal(myNode->linker[i]);
+	}
+}
+
+int main() {
+
+#define IN(v) {root = insertion(root, v);printTree(root); }
+#define DEL(v) {delete (v, root);printTree(root); }
+	IN(5);
+	IN(6);
+	IN(9);
+	IN(13);
+	IN(8);
+	IN(2);
+	IN(12);
+	IN(15);
+
+	return 0;
 }

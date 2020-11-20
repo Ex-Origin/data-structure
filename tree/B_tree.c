@@ -1,6 +1,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #define TREE 3
 
@@ -239,11 +240,11 @@ void leftShift(struct BTreeNode* myNode, int pos) {
 // Merge the nodes
 void mergeNodes(struct BTreeNode* myNode, int pos) {
 	int j = 1;
-	struct BTreeNode* x1 = myNode->linker[pos], * x2 = myNode->linker[pos - 1];
+	struct BTreeNode* x1 = myNode->linker[pos], *x2 = myNode->linker[pos - 1];
 
 	x2->count++;
 	x2->item[x2->count] = myNode->item[pos];
-	x2->linker[x2->count] = myNode->linker[0];
+	x2->linker[x2->count] = x1->linker[0];
 
 	while (j <= x1->count) {
 		x2->count++;
@@ -259,6 +260,7 @@ void mergeNodes(struct BTreeNode* myNode, int pos) {
 		j++;
 	}
 	myNode->count--;
+	memset(x1, 0, sizeof(struct BTreeNode));
 	free(x1);
 }
 
@@ -347,6 +349,7 @@ void delete (int item, struct BTreeNode* myNode) {
 		if (myNode->count == 0) {
 			tmp = myNode;
 			myNode = myNode->linker[0];
+			memset(tmp, 0, sizeof(struct BTreeNode));
 			free(tmp);
 		}
 	}
@@ -384,6 +387,46 @@ void traversal(struct BTreeNode* myNode) {
 		}
 		traversal(myNode->linker[i]);
 	}
+}
+
+void test()
+{
+#define NUM 8
+	int num[NUM], i, ii, temp;
+	srand(time(NULL));
+	for (i = 0; i < NUM; i++)
+	{
+		do
+		{
+			temp = rand() % 100;
+			for (ii = 0; ii < i; ii++)
+			{
+				if (num[ii] == temp)
+				{
+					break;
+				}
+			}
+			num[i] = temp;
+		} while (i != ii);
+	}
+	printf("number: ");
+	for (i = 0; i < NUM; i++)
+	{
+		printf("%2d  ", num[i]);
+	}
+	printf("\n");
+	printf("Please build: ");
+	getchar(); // pause()
+	for (i = 0; i < NUM; i++)
+	{
+		root = insertion(root, num[i]);
+		printTree(root);
+	}
+	temp = rand() % NUM;
+	printf("Please delete: %d ", num[temp]);
+	getchar();
+	delete(num[temp], root);
+	printTree(root);
 }
 
 int main() {

@@ -3,4 +3,8 @@
 
 ### 2020-11-20
 
-Fix a bug in B_tree.c:`delete`.
+Fix a bug in B_tree.c:`delete -> mergeNodes`.
+
+### 2020-11-20
+
+Fix a bug in B_tree.c:`delete -> rightShift`.

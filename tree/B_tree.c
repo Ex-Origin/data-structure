@@ -210,7 +210,7 @@ void rightShift(struct BTreeNode* myNode, int pos) {
 
 	x = myNode->linker[pos - 1];
 	myNode->item[pos] = x->item[x->count];
-	myNode->linker[pos] = x->linker[x->count];
+	// myNode->linker[pos] = x->linker[x->count];
 	x->count--;
 	return;
 }

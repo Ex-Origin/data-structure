@@ -2,13 +2,6 @@
 
 #include <stdio.h>
 
-// Function to swap position of elements
-void swap(int* a, int* b) {
-    int t = *a;
-    *a = *b;
-    *b = t;
-}
-
 // Function to partition the array on the basis of pivot element
 int partition(int array[], int low, int high) {
 
@@ -23,7 +16,7 @@ int partition(int array[], int low, int high) {
         while(low < high && array[low] <= pivot) ++ low;
         array[high] = array[low];
     }
-    
+
     array[low] = pivot;
     return low;
 }

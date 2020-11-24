@@ -13,20 +13,19 @@ void swap(int* a, int* b) {
 int partition(int array[], int low, int high) {
 
     // Select the pivot element
-    int pivot = array[high];
-    int i = (low - 1);
+    int pivot = array[low];
+    while(low < high){
+        /* Put the elements smaller than pivot on the left  */
+        while( low < high && array[high] >= pivot) -- high;
+        array[low] = array[high];
 
-    // Put the elements smaller than pivot on the left 
-    // and greater than pivot on the right of pivot
-    for (int j = low; j < high; j++) {
-        if (array[j] <= pivot) {
-            i++;
-            swap(&array[i], &array[j]);
-        }
+        /* Put the elements  greater than pivot on the right of pivot */
+        while(low < high && array[low] <= pivot) ++ low;
+        array[high] = array[low];
     }
-
-    swap(&array[i + 1], &array[high]);
-    return (i + 1);
+    
+    array[low] = pivot;
+    return low;
 }
 
 
